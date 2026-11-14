@@ -18,6 +18,9 @@ public class App extends Application {
         primaryStage.setScene(scene);
         primaryStage.setMaximized(true);
         primaryStage.show();
+        
+        // Request focus on the root so keyboard events are captured immediately
+        root.requestFocus();
     }
 
     public static void main(String[] args) {

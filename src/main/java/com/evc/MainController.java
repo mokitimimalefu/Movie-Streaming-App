@@ -28,12 +28,10 @@ public class MainController {
 
         mainLayout.setTop(new Header());
 
-        // Create the sidebar and tell it what to do when an item is clicked
         Sidebar sidebar = new Sidebar();
         sidebar.setOnMenuItemClicked(this::showScreen);
         mainLayout.setLeft(sidebar);
 
-        // Load the default screen (Categories)
         showScreen("Categories");
 
         absoluteRoot.getChildren().addAll(mainLayout, videoPlayer);
@@ -47,19 +45,16 @@ public class MainController {
         Map<String, List<Movie>> categories = MovieData.getCategorizedMovies();
 
         if (screenName.equals("Categories") || screenName.equals("Home")) {
-            // Show everything
             contentBox.getChildren().add(new FeaturedMovies(videoPlayer));
             for (Map.Entry<String, List<Movie>> entry : categories.entrySet()) {
                 contentBox.getChildren().add(new CategoryBar(entry.getKey(), entry.getValue(), videoPlayer));
             }
         } else if (screenName.equals("Trending")) {
-            // Show Action movies as "Trending"
             List<Movie> actions = categories.get("Action");
             if (actions != null) {
                 contentBox.getChildren().add(new CategoryBar("Trending Now", actions, videoPlayer));
             }
         } else {
-            // Placeholder for Coming Soon, History, Saved, etc.
             Label placeholder = new Label(screenName + " section is currently empty.");
             placeholder.setStyle("-fx-text-fill: #aaaaaa; -fx-font-size: 20px; -fx-padding: 50px;");
             contentBox.getChildren().add(placeholder);
@@ -70,7 +65,6 @@ public class MainController {
         scrollPane.setFitToWidth(true);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         
-        // This replaces the center content!
         mainLayout.setCenter(scrollPane);
     }
 }
