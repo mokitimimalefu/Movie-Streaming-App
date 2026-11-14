@@ -11,7 +11,12 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 
+import java.util.function.Consumer;
+
 public class Sidebar extends VBox {
+    
+    private Consumer<String> onMenuItemClicked;
+
     public Sidebar() {
         this.getStyleClass().add("sidebar");
         this.setPrefWidth(220);
@@ -43,6 +48,10 @@ public class Sidebar extends VBox {
         this.getChildren().addAll(topMenu, libraryMenu, spacer, bottomMenu);
     }
 
+    public void setOnMenuItemClicked(Consumer<String> callback) {
+        this.onMenuItemClicked = callback;
+    }
+
     private HBox createMenuItem(String text, boolean isActive) {
         HBox item = new HBox(15);
         item.setAlignment(Pos.CENTER_LEFT);
@@ -62,6 +71,14 @@ public class Sidebar extends VBox {
         activeLine.setStyle(isActive ? "-fx-background-color: #3b82f6;" : "-fx-background-color: transparent;");
 
         item.getChildren().addAll(activeLine, icon, label);
+
+        // THIS IS THE NEW PART: Click Event
+        item.setOnMouseClicked(e -> {
+            if (onMenuItemClicked != null) {
+                onMenuItemClicked.accept(text);
+            }
+        });
+
         return item;
     }
 }

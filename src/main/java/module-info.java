@@ -3,6 +3,9 @@ module com.evc {
     requires javafx.fxml;
     requires javafx.web;
     requires javafx.media;
+    
+    // REQUIRED for the built-in Java HTTP server
+    requires jdk.httpserver;
 
     opens com.evc to javafx.fxml;
     exports com.evc;

@@ -1,5 +1,8 @@
 package com.evc.view;
 
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
 import javafx.concurrent.Worker;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -10,12 +13,18 @@ import javafx.scene.media.AudioClip;
 import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebView;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+
 public class VideoPlayer extends StackPane {
     private WebView webView;
     private WebEngine webEngine;
     private LoadingAnimation loadingAnimation;
     private AudioClip clickSound;
     private String currentVideoId = "";
+    private HttpServer server;
+    private int serverPort;
 
     public VideoPlayer() {
         this.getStyleClass().add("video-player-root");
@@ -27,11 +36,15 @@ public class VideoPlayer extends StackPane {
             System.out.println("Click sound not found.");
         }
 
+        // Start the built-in Java HTTP server
+        startLocalServer();
+
         webView = new WebView();
         webView.setVisible(false);
+        webView.setContextMenuEnabled(false);
         webEngine = webView.getEngine();
         webEngine.setJavaScriptEnabled(true);
-        // Pretend to be modern Chrome - this fixes Error 153
+        
         webEngine.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36");
 
         loadingAnimation = new LoadingAnimation();
@@ -77,6 +90,51 @@ public class VideoPlayer extends StackPane {
         this.getChildren().addAll(layout, loadingAnimation);
     }
 
+    private void startLocalServer() {
+        try {
+            server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            serverPort = server.getAddress().getPort();
+            
+            server.createContext("/player", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    String query = exchange.getRequestURI().getQuery();
+                    String videoId = "";
+                    if (query != null && query.contains("v=")) {
+                        videoId = query.split("v=")[1].split("&")[0];
+                    }
+
+                    // FULL SCREEN FIX: Using 100vw and 100vh with absolute positioning
+                    String html = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+                        + "<style>"
+                        + "  body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: black; overflow: hidden; }"
+                        + "  .video-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; }"
+                        + "  iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }"
+                        + "</style>"
+                        + "</head><body>"
+                        + "<div class='video-container'>"
+                        + "<iframe id='player' "
+                        + "src='https://www.youtube.com/embed/" + videoId + "?autoplay=1&enablejsapi=1&rel=0&modestbranding=1&playsinline=1' "
+                        + "frameborder='0' allow='autoplay; encrypted-media' allowfullscreen></iframe>"
+                        + "</div>"
+                        + "</body></html>";
+
+                    byte[] response = html.getBytes("UTF-8");
+                    exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+                    exchange.sendResponseHeaders(200, response.length);
+                    OutputStream os = exchange.getResponseBody();
+                    os.write(response);
+                    os.close();
+                }
+            });
+            
+            server.start();
+            System.out.println("Local video server started on port: " + serverPort);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public void playVideo(String embedUrl) {
         this.setVisible(true);
         this.toFront();
@@ -84,7 +142,6 @@ public class VideoPlayer extends StackPane {
         loadingAnimation.reset();
         webView.setVisible(false);
 
-        // Extract just the ID: https://www.youtube.com/embed/XXXX -> XXXX
         String videoId = embedUrl;
         if (videoId.contains("/embed/")) {
             videoId = videoId.substring(videoId.indexOf("/embed/") + 7);
@@ -94,39 +151,22 @@ public class VideoPlayer extends StackPane {
         }
         currentVideoId = videoId;
 
-        // Load OUR OWN HTML page with YouTube IFrame API inside
-        // This is what stops Error 153
-        String html = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
-            + "<style>body{margin:0;background:black;} iframe{width:100%;height:100%;}</style></head>"
-            + "<body>"
-            + "<div id='player'></div>"
-            + "<script>"
-            + "var tag=document.createElement('script');"
-            + "tag.src='https://www.youtube.com/iframe_api';"
-            + "document.head.appendChild(tag);"
-            + "var player;"
-            + "function onYouTubeIframeAPIReady(){"
-            + " player=new YT.Player('player',{height:'100%',width:'100%',videoId:'" + videoId + "',"
-            + " playerVars:{'autoplay':1,'enablejsapi':1,'rel':0,'modestbranding':1},"
-            + " events:{'onReady':function(e){e.target.playVideo();}}});}"
-            + "function playVideo(){if(player) player.playVideo();}"
-            + "function pauseVideo(){if(player) player.pauseVideo();}"
-            + "</script></body></html>";
-
-        webEngine.loadContent(html);
+        String localUrl = "http://127.0.0.1:" + serverPort + "/player?v=" + videoId;
+        webEngine.load(localUrl);
     }
 
     public void stopVideo() {
-        sendYouTubeCommand("pauseVideo");
-        webEngine.loadContent("<html><body style='background:black'></body></html>");
+        webEngine.load("about:blank");
         this.setVisible(false);
     }
 
     private void sendYouTubeCommand(String command) {
         if (webEngine == null) return;
         try {
-            // Call the function we defined in the HTML above
-            webEngine.executeScript(command + "();");
+            String js = "var iframe = document.getElementById('player'); if(iframe && iframe.contentWindow) { "
+                      + "iframe.contentWindow.postMessage('{\"event\":\"command\",\"func\":\"" 
+                      + command + "\",\"args\":[]}', '*'); }";
+            webEngine.executeScript(js);
         } catch (Exception e) {
             System.out.println("YouTube command failed: " + command);
         }
