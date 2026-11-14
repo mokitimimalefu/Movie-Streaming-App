@@ -21,7 +21,9 @@ public class Sidebar extends VBox {
         this.getStyleClass().add("sidebar");
         this.setPrefWidth(220);
         this.setPadding(new Insets(20, 0, 20, 0));
+        this.setStyle("-fx-background-color: #0f0f0f;");
 
+        // --- TOP MENU ---
         VBox topMenu = new VBox(10);
         topMenu.getChildren().addAll(
                 createMenuItem("Home", false),
@@ -30,9 +32,11 @@ public class Sidebar extends VBox {
                 createMenuItem("Categories", true)
         );
 
+        // Spacer — pushes bottom items down
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
 
+        // --- LIBRARY MENU ---
         VBox libraryMenu = new VBox(10);
         libraryMenu.setPadding(new Insets(20, 0, 20, 0));
         libraryMenu.getChildren().addAll(
@@ -42,37 +46,62 @@ public class Sidebar extends VBox {
                 createMenuItem("Downloads", false)
         );
 
+        // --- BOTTOM MENU ---
         VBox bottomMenu = new VBox(10);
-        bottomMenu.getChildren().addAll(createMenuItem("Settings", false));
+        bottomMenu.getChildren().add(createMenuItem("Settings", false));
 
+        // Assemble sidebar
         this.getChildren().addAll(topMenu, libraryMenu, spacer, bottomMenu);
     }
 
+    // Register callback for when items are clicked
     public void setOnMenuItemClicked(Consumer<String> callback) {
         this.onMenuItemClicked = callback;
     }
 
+    // Create individual menu items
     private HBox createMenuItem(String text, boolean isActive) {
         HBox item = new HBox(15);
         item.setAlignment(Pos.CENTER_LEFT);
         item.setPadding(new Insets(10, 20, 10, 20));
         item.setCursor(Cursor.HAND);
-        item.getStyleClass().add(isActive ? "sidebar-menu-item-active" : "sidebar-menu-item");
+        item.setStyle("-fx-background-color: transparent;");
 
-        Label icon = new Label("■");
-        icon.getStyleClass().add(isActive ? "sidebar-icon-active" : "sidebar-icon-inactive");
-
-        Label label = new Label(text);
-        label.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 14));
-        label.getStyleClass().add(isActive ? "sidebar-text-active" : "sidebar-text-inactive");
-
+        // Active indicator line
         Region activeLine = new Region();
         activeLine.setPrefWidth(4);
+        activeLine.setPrefHeight(20);
         activeLine.setStyle(isActive ? "-fx-background-color: #3b82f6;" : "-fx-background-color: transparent;");
+
+        // Icon
+        Label icon = new Label("■");
+        icon.setFont(Font.font(12));
+        icon.setTextFill(isActive ? javafx.scene.paint.Color.web("#3b82f6") : javafx.scene.paint.Color.web("#777777"));
+
+        // Text label
+        Label label = new Label(text);
+        label.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 14));
+        label.setTextFill(isActive ? javafx.scene.paint.Color.WHITE : javafx.scene.paint.Color.web("#aaaaaa"));
 
         item.getChildren().addAll(activeLine, icon, label);
 
-        // THIS IS THE NEW PART: Click Event
+        // Hover effect
+        item.setOnMouseEntered(e -> {
+            if (!isActive) {
+                item.setStyle("-fx-background-color: rgba(255,255,255,0.05);");
+                label.setTextFill(javafx.scene.paint.Color.WHITE);
+                icon.setTextFill(javafx.scene.paint.Color.web("#cccccc"));
+            }
+        });
+        item.setOnMouseExited(e -> {
+            if (!isActive) {
+                item.setStyle("-fx-background-color: transparent;");
+                label.setTextFill(javafx.scene.paint.Color.web("#aaaaaa"));
+                icon.setTextFill(javafx.scene.paint.Color.web("#777777"));
+            }
+        });
+
+        // Click handler — send text back to MainController
         item.setOnMouseClicked(e -> {
             if (onMenuItemClicked != null) {
                 onMenuItemClicked.accept(text);
