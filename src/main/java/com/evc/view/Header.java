@@ -12,8 +12,14 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 
+import java.util.function.Consumer;
+
 public class Header extends HBox {
     public Header() {
+        this(query -> { });
+    }
+
+    public Header(Consumer<String> onSearchChanged) {
         this.getStyleClass().add("header");
         this.setAlignment(Pos.CENTER);
         this.setPadding(new Insets(15, 30, 15, 30));
@@ -35,10 +41,14 @@ public class Header extends HBox {
         searchBox.setMaxWidth(400);
         TextField searchField = new TextField();
         searchField.setPromptText("Search...");
+        searchField.textProperty().addListener((observable, oldValue, newValue) ->
+                onSearchChanged.accept(newValue));
+        searchField.setOnAction(event -> onSearchChanged.accept(searchField.getText()));
         HBox.setHgrow(searchField, Priority.ALWAYS);
         Label searchIcon = new Label("🔍");
         searchIcon.setTextFill(Color.web("#3b82f6"));
         searchIcon.setCursor(Cursor.HAND);
+        searchIcon.setOnMouseClicked(event -> onSearchChanged.accept(searchField.getText()));
         searchBox.getChildren().addAll(searchField, searchIcon);
 
         Region spacer = new Region();

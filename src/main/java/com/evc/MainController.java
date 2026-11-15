@@ -9,11 +9,16 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.*;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Locale;
 import com.evc.model.Movie;
 
 public class MainController {
     private BorderPane mainLayout;
     private VideoPlayer videoPlayer;
+    private String currentScreen = "Categories";
+    private String searchQuery = "";
 
     public StackPane getRootLayout() {
         StackPane absoluteRoot = new StackPane();
@@ -25,7 +30,10 @@ public class MainController {
         videoPlayer = new VideoPlayer();
         videoPlayer.setVisible(false);
 
-        mainLayout.setTop(new Header());
+        mainLayout.setTop(new Header(query -> {
+            searchQuery = query == null ? "" : query.trim();
+            renderCurrentScreen();
+        }));
 
         Sidebar sidebar = new Sidebar();
         sidebar.setOnMenuItemClicked(this::showScreen);
@@ -38,12 +46,31 @@ public class MainController {
     }
 
     private void showScreen(String screenName) {
+        currentScreen = screenName;
+        renderCurrentScreen();
+    }
+
+    private void renderCurrentScreen() {
         VBox contentBox = new VBox(20);
         contentBox.setPadding(new Insets(0, 0, 50, 40));
 
         Map<String, List<Movie>> categories = MovieData.getCategorizedMovies();
 
-        if (screenName.equals("Home") || screenName.equals("Categories")) {
+        if (!searchQuery.isEmpty()) {
+            Map<String, List<Movie>> matchingCategories = findMatchingMovies(categories, searchQuery);
+            if (matchingCategories.isEmpty()) {
+                Label noResults = new Label("No movies found for \"" + searchQuery + "\".");
+                noResults.setStyle("-fx-text-fill: #aaaaaa; -fx-font-size: 16px; -fx-padding: 50px;");
+                contentBox.getChildren().add(noResults);
+            } else {
+                for (Map.Entry<String, List<Movie>> entry : matchingCategories.entrySet()) {
+                    contentBox.getChildren().add(
+                            new CategoryBar(entry.getKey(), entry.getValue(), videoPlayer)
+                    );
+                }
+            }
+        }
+        else if (currentScreen.equals("Home") || currentScreen.equals("Categories")) {
             contentBox.getChildren().add(new FeaturedMovies(videoPlayer));
             for (Map.Entry<String, List<Movie>> entry : categories.entrySet()) {
                 contentBox.getChildren().add(
@@ -51,7 +78,7 @@ public class MainController {
                 );
             }
         }
-        else if (screenName.equals("Trending")) {
+        else if (currentScreen.equals("Trending")) {
             List<Movie> actions = categories.get("Action & Adventure");
             
             if (actions != null) {
@@ -64,42 +91,42 @@ public class MainController {
                 contentBox.getChildren().add(error);
             }
         }
-        else if (screenName.equals("Coming Soon")) {
+        else if (currentScreen.equals("Coming Soon")) {
             Label title = new Label("Coming Soon");
             title.setStyle("-fx-text-fill: #ffffff; -fx-font-size: 28px; -fx-font-weight: bold;");
             Label desc = new Label("New movies and trailers will be added here soon.\n\nCheck back later for updates.");
             desc.setStyle("-fx-text-fill: #aaaaaa; -fx-font-size: 16px; -fx-padding: 20 0 0 0;");
             contentBox.getChildren().addAll(title, desc);
         }
-        else if (screenName.equals("History")) {
+        else if (currentScreen.equals("History")) {
             Label title = new Label("Watch History");
             title.setStyle("-fx-text-fill: #ffffff; -fx-font-size: 28px; -fx-font-weight: bold;");
             Label desc = new Label("Movies you've watched will appear here.");
             desc.setStyle("-fx-text-fill: #aaaaaa; -fx-font-size: 16px; -fx-padding: 20 0 0 0;");
             contentBox.getChildren().addAll(title, desc);
         }
-        else if (screenName.equals("Saved")) {
+        else if (currentScreen.equals("Saved")) {
             Label title = new Label("My List");
             title.setStyle("-fx-text-fill: #ffffff; -fx-font-size: 28px; -fx-font-weight: bold;");
             Label desc = new Label("Save movies to watch later — they will show up here.");
             desc.setStyle("-fx-text-fill: #aaaaaa; -fx-font-size: 16px; -fx-padding: 20 0 0 0;");
             contentBox.getChildren().addAll(title, desc);
         }
-        else if (screenName.equals("My Library")) {
+        else if (currentScreen.equals("My Library")) {
             Label title = new Label("My Library");
             title.setStyle("-fx-text-fill: #ffffff; -fx-font-size: 28px; -fx-font-weight: bold;");
             Label desc = new Label("Your personal collection of favorite movies.");
             desc.setStyle("-fx-text-fill: #aaaaaa; -fx-font-size: 16px; -fx-padding: 20 0 0 0;");
             contentBox.getChildren().addAll(title, desc);
         }
-        else if (screenName.equals("Downloads")) {
+        else if (currentScreen.equals("Downloads")) {
             Label title = new Label("Downloads");
             title.setStyle("-fx-text-fill: #ffffff; -fx-font-size: 28px; -fx-font-weight: bold;");
             Label desc = new Label("Downloaded movie trailers will appear here.");
             desc.setStyle("-fx-text-fill: #aaaaaa; -fx-font-size: 16px; -fx-padding: 20 0 0 0;");
             contentBox.getChildren().addAll(title, desc);
         }
-        else if (screenName.equals("Settings")) {
+        else if (currentScreen.equals("Settings")) {
             Label title = new Label("Settings");
             title.setStyle("-fx-text-fill: #ffffff; -fx-font-size: 28px; -fx-font-weight: bold; -fx-padding: 0 0 30 0;");
 
@@ -216,7 +243,7 @@ public class MainController {
             contentBox.getChildren().addAll(title, settingsBox);
         }
         else {
-            Label unknown = new Label(screenName + "\n\nThis page is coming soon.");
+            Label unknown = new Label(currentScreen + "\n\nThis page is coming soon.");
             unknown.setStyle("-fx-text-fill: #888888; -fx-font-size: 18px; -fx-padding: 50px;");
             contentBox.getChildren().add(unknown);
         }
@@ -227,5 +254,26 @@ public class MainController {
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 
         mainLayout.setCenter(scrollPane);
+    }
+
+    private Map<String, List<Movie>> findMatchingMovies(
+            Map<String, List<Movie>> categories, String query) {
+        String normalizedQuery = query.toLowerCase(Locale.ROOT);
+        Map<String, List<Movie>> matches = new LinkedHashMap<>();
+
+        for (Map.Entry<String, List<Movie>> category : categories.entrySet()) {
+            List<Movie> matchingMovies = new ArrayList<>();
+            for (Movie movie : category.getValue()) {
+                if (movie.getTitle().toLowerCase(Locale.ROOT).contains(normalizedQuery)
+                        || movie.getYear().toLowerCase(Locale.ROOT).contains(normalizedQuery)
+                        || movie.getCategory().toLowerCase(Locale.ROOT).contains(normalizedQuery)) {
+                    matchingMovies.add(movie);
+                }
+            }
+            if (!matchingMovies.isEmpty()) {
+                matches.put(category.getKey(), matchingMovies);
+            }
+        }
+        return matches;
     }
 }

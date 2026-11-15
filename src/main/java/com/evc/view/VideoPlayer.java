@@ -3,10 +3,11 @@ package com.evc.view;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+import javafx.animation.PauseTransition;
 import javafx.concurrent.Worker;
+import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
@@ -14,6 +15,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.media.AudioClip;
 import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebView;
+import javafx.util.Duration;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -24,12 +26,13 @@ public class VideoPlayer extends StackPane {
     private WebEngine webEngine;
     private LoadingAnimation loadingAnimation;
     private AudioClip clickSound;
-    private String currentVideoId = "";
     private HttpServer server;
     private int serverPort;
-    
+    private PauseTransition loadTimeout;
+    private final EventHandler<KeyEvent> keyEventHandler = this::handleKeyEvent;
+
     // State tracking for volume
-    private int currentVolume = 100; 
+    private int currentVolume = 100;
     private boolean isMuted = false;
 
     public VideoPlayer() {
@@ -47,22 +50,42 @@ public class VideoPlayer extends StackPane {
         webView = new WebView();
         webView.setVisible(false);
         webView.setContextMenuEnabled(false);
-        webView.setFocusTraversable(false); 
-        
+        webView.setFocusTraversable(false);
+
         webEngine = webView.getEngine();
         webEngine.setJavaScriptEnabled(true);
-        webEngine.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36");
+        webEngine.setUserAgent(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                        + "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+        );
 
         loadingAnimation = new LoadingAnimation();
+        loadTimeout = new PauseTransition(Duration.seconds(15));
+        loadTimeout.setOnFinished(event -> {
+            if (!webView.isVisible()) {
+                loadingAnimation.showError();
+            }
+        });
 
         webEngine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
+            System.out.println("📹 Load state changed: " + oldState + " → " + newState);
+
             if (newState == Worker.State.SUCCEEDED) {
+                loadTimeout.stop();
                 loadingAnimation.setVisible(false);
                 webView.setVisible(true);
-                this.requestFocus(); 
+                this.requestFocus();
+                System.out.println("✅ Video page loaded successfully");
             }
             if (newState == Worker.State.FAILED) {
+                loadTimeout.stop();
                 loadingAnimation.showError();
+                System.err.println("❌ Load failed: " + webEngine.getLoadWorker().getException());
+            }
+            if (newState == Worker.State.CANCELLED) {
+                loadTimeout.stop();
+                loadingAnimation.showError();
+                System.out.println("⚠️ Load was cancelled");
             }
         });
 
@@ -70,7 +93,7 @@ public class VideoPlayer extends StackPane {
         playBtn.setOnMouseClicked(e -> {
             playClickSound();
             sendYouTubeCommand("playVideo");
-            this.requestFocus(); 
+            this.requestFocus();
         });
 
         IconButton pauseBtn = new IconButton("/com/evc/images/icons/pause.png", "PAUSE");
@@ -98,129 +121,130 @@ public class VideoPlayer extends StackPane {
 
         this.getChildren().addAll(layout, loadingAnimation);
 
-        // ==========================================
-        // GLOBAL SCENE KEY LISTENER
-        // ==========================================
         this.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (oldScene != null) {
+                oldScene.removeEventFilter(KeyEvent.ANY, keyEventHandler);
+            }
             if (newScene != null) {
-                newScene.addEventFilter(KeyEvent.ANY, event -> {
-                    if (!this.isVisible()) return;
-
-                    if (event.getEventType() == KeyEvent.KEY_PRESSED) {
-                        KeyCode code = event.getCode();
-
-                        switch (code) {
-                            case SPACE:
-                                togglePlayPauseJS();
-                                playClickSound();
-                                event.consume();
-                                break;
-                            case K:
-                                sendYouTubeCommand("pauseVideo");
-                                playClickSound();
-                                event.consume();
-                                break;
-                            case LEFT:
-                                seekVideo(-10);
-                                event.consume();
-                                break;
-                            case RIGHT:
-                                seekVideo(10);
-                                event.consume();
-                                break;
-                            case UP:
-                                // Increase volume
-                                if (isMuted) {
-                                    isMuted = false;
-                                    sendYouTubeCommand("unMute");
-                                }
-                                currentVolume = Math.min(100, currentVolume + 10);
-                                sendYouTubeCommand("setVolume", currentVolume);
-                                System.out.println("Volume: " + currentVolume + "%");
-                                event.consume();
-                                break;
-                            case DOWN:
-                                // Decrease volume
-                                if (isMuted) {
-                                    isMuted = false;
-                                    sendYouTubeCommand("unMute");
-                                }
-                                currentVolume = Math.max(0, currentVolume - 10);
-                                sendYouTubeCommand("setVolume", currentVolume);
-                                System.out.println("Volume: " + currentVolume + "%");
-                                event.consume();
-                                break;
-                            case M:
-                                // Toggle Mute
-                                if (isMuted) {
-                                    sendYouTubeCommand("unMute");
-                                    isMuted = false;
-                                    System.out.println("Unmuted");
-                                } else {
-                                    sendYouTubeCommand("mute");
-                                    isMuted = true;
-                                    System.out.println("Muted");
-                                }
-                                event.consume();
-                                break;
-                            case ESCAPE:
-                                stopVideo();
-                                event.consume();
-                                break;
-                            default:
-                                break;
-                        }
-                    }
-                });
+                newScene.addEventFilter(KeyEvent.ANY, keyEventHandler);
             }
         });
     }
 
+    private void handleKeyEvent(KeyEvent event) {
+        if (!isVisible() || event.getEventType() != KeyEvent.KEY_PRESSED) {
+            return;
+        }
+
+        switch (event.getCode()) {
+            case SPACE:
+                togglePlayPauseJS();
+                playClickSound();
+                event.consume();
+                break;
+            case K:
+                sendYouTubeCommand("pauseVideo");
+                playClickSound();
+                event.consume();
+                break;
+            case LEFT:
+                seekVideo(-10);
+                event.consume();
+                break;
+            case RIGHT:
+                seekVideo(10);
+                event.consume();
+                break;
+            case UP:
+                if (isMuted) {
+                    isMuted = false;
+                    sendYouTubeCommand("unMute");
+                }
+                currentVolume = Math.min(100, currentVolume + 10);
+                sendYouTubeCommand("setVolume", currentVolume);
+                System.out.println("🔊 Volume: " + currentVolume + "%");
+                event.consume();
+                break;
+            case DOWN:
+                if (isMuted) {
+                    isMuted = false;
+                    sendYouTubeCommand("unMute");
+                }
+                currentVolume = Math.max(0, currentVolume - 10);
+                sendYouTubeCommand("setVolume", currentVolume);
+                System.out.println("🔉 Volume: " + currentVolume + "%");
+                event.consume();
+                break;
+            case M:
+                if (isMuted) {
+                    sendYouTubeCommand("unMute");
+                    isMuted = false;
+                    System.out.println("🔊 Unmuted");
+                } else {
+                    sendYouTubeCommand("mute");
+                    isMuted = true;
+                    System.out.println("🔇 Muted");
+                }
+                event.consume();
+                break;
+            case ESCAPE:
+                stopVideo();
+                event.consume();
+                break;
+            default:
+                break;
+        }
+    }
+
     private void togglePlayPauseJS() {
-        if (webEngine == null) return;
+        if (webEngine == null) {
+            return;
+        }
         try {
-            String js = 
-                "var iframe = document.getElementById('player'); " +
-                "if(iframe && iframe.contentWindow) { " +
-                "  if (window.isVideoPlaying === undefined) window.isVideoPlaying = true; " +
-                "  if (window.isVideoPlaying) { " +
-                "    iframe.contentWindow.postMessage('{\"event\":\"command\",\"func\":\"pauseVideo\",\"args\":[]}', '*'); " +
-                "    window.isVideoPlaying = false; " +
-                "  } else { " +
-                "    iframe.contentWindow.postMessage('{\"event\":\"command\",\"func\":\"playVideo\",\"args\":[]}', '*'); " +
-                "    window.isVideoPlaying = true; " +
-                "  } " +
-                "}";
+            String js =
+                    "var iframe = document.getElementById('player'); "
+                            + "if(iframe && iframe.contentWindow) { "
+                            + "  if (window.isVideoPlaying === undefined) window.isVideoPlaying = true; "
+                            + "  if (window.isVideoPlaying) { "
+                            + "    iframe.contentWindow.postMessage('{\"event\":\"command\",\"func\":\"pauseVideo\",\"args\":[]}', '*'); "
+                            + "    window.isVideoPlaying = false; "
+                            + "  } else { "
+                            + "    iframe.contentWindow.postMessage('{\"event\":\"command\",\"func\":\"playVideo\",\"args\":[]}', '*'); "
+                            + "    window.isVideoPlaying = true; "
+                            + "  } "
+                            + "}";
             webEngine.executeScript(js);
         } catch (Exception e) {
-            System.out.println("Toggle failed: " + e.getMessage());
+            System.out.println("⚠️ Toggle failed: " + e.getMessage());
         }
     }
 
     private void seekVideo(double seconds) {
-        if (webEngine == null) return;
+        if (webEngine == null) {
+            return;
+        }
         try {
-            String js = 
-                "var iframe = document.getElementById('player'); " +
-                "if(iframe && iframe.contentWindow) { " +
-                "  var listener = function(event) { " +
-                "    try { " +
-                "      var data = JSON.parse(event.data); " +
-                "      if (data.event === 'infoDelivery' && data.info && data.info.currentTime !== undefined) { " +
-                "        window.removeEventListener('message', listener); " +
-                "        var currentTime = data.info.currentTime; " +
-                "        var newTime = currentTime + (" + seconds + "); " +
-                "        if (newTime < 0) newTime = 0; " +
-                "        iframe.contentWindow.postMessage('{\"event\":\"command\",\"func\":\"seekTo\",\"args\":[' + newTime + ', true]}', '*'); " +
-                "      } " +
-                "    } catch(e) {} " +
-                "  }; " +
-                "  window.addEventListener('message', listener); " +
-                "  iframe.contentWindow.postMessage('{\"event\":\"listening\",\"id\":1}', '*'); " +
-                "}";
+            String js =
+                    "var iframe = document.getElementById('player'); "
+                            + "if(iframe && iframe.contentWindow) { "
+                            + "  var listener = function(event) { "
+                            + "    try { "
+                            + "      var data = JSON.parse(event.data); "
+                            + "      if (data.event === 'infoDelivery' && data.info && data.info.currentTime !== undefined) { "
+                            + "        window.removeEventListener('message', listener); "
+                            + "        var currentTime = data.info.currentTime; "
+                            + "        var newTime = currentTime + (" + seconds + "); "
+                            + "        if (newTime < 0) newTime = 0; "
+                            + "        iframe.contentWindow.postMessage('{\"event\":\"command\",\"func\":\"seekTo\",\"args\":[' + newTime + ', true]}', '*'); "
+                            + "      } "
+                            + "    } catch(e) {} "
+                            + "  }; "
+                            + "  window.addEventListener('message', listener); "
+                            + "  iframe.contentWindow.postMessage('{\"event\":\"listening\",\"id\":1}', '*'); "
+                            + "}";
             webEngine.executeScript(js);
         } catch (Exception e) {
-            System.out.println("Seek failed: " + e.getMessage());
+            System.out.println("⚠️ Seek failed: " + e.getMessage());
         }
     }
 
@@ -228,49 +252,68 @@ public class VideoPlayer extends StackPane {
         try {
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             serverPort = server.getAddress().getPort();
-            
+
             server.createContext("/player", new HttpHandler() {
                 @Override
                 public void handle(HttpExchange exchange) throws IOException {
                     String query = exchange.getRequestURI().getQuery();
-                    String videoId = "";
+                    String videoId = null;
+
                     if (query != null && query.contains("v=")) {
-                        videoId = query.split("v=")[1].split("&")[0];
+                        for (String parameter : query.split("&")) {
+                            if (parameter.startsWith("v=")) {
+                                videoId = parameter.substring(2);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (videoId == null || !videoId.matches("[A-Za-z0-9_-]{11}")) {
+                        byte[] error = "Invalid video ID".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(400, error.length);
+                        try (OutputStream os = exchange.getResponseBody()) {
+                            os.write(error);
+                        }
+                        return;
                     }
 
                     String html = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
-                        + "<style>"
-                        + "  body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: black; overflow: hidden; }"
-                        + "  .video-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; }"
-                        + "  iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }"
-                        + "</style>"
-                        + "</head><body>"
-                        + "<div class='video-container'>"
-                        + "<iframe id='player' "
-                        + "src='https://www.youtube.com/embed/" + videoId + "?autoplay=1&enablejsapi=1&rel=0&modestbranding=1&playsinline=1&origin=http://127.0.0.1:" + serverPort + "' " 
-                        + "frameborder='0' allow='autoplay; encrypted-media' allowfullscreen></iframe>"
-                        + "</div>"
-                        + "<script>"
-                        + "  window.onload = function() { "
-                        + "    var iframe = document.getElementById('player'); "
-                        + "    iframe.contentWindow.postMessage('{\"event\":\"listening\",\"id\":1}', '*'); "
-                        + "    window.isVideoPlaying = true; "
-                        + "  };"
-                        + "</script>"
-                        + "</body></html>";
+                            + "<style>"
+                            + "  body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }"
+                            + "  .video-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; }"
+                            + "  iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }"
+                            + "</style>"
+                            + "</head><body>"
+                            + "<div class='video-container'>"
+                            + "<iframe id='player' "
+                            + "src='https://www.youtube.com/embed/" + videoId
+                            + "?autoplay=1&enablejsapi=1&rel=0&modestbranding=1&playsinline=1&origin=http://127.0.0.1:"
+                            + serverPort + "' "
+                            + "frameborder='0' allow='autoplay; encrypted-media; picture-in-picture' allowfullscreen></iframe>"
+                            + "</div>"
+                            + "<script>"
+                            + "  window.onload = function() { "
+                            + "    console.log('Player iframe loaded'); "
+                            + "    var iframe = document.getElementById('player'); "
+                            + "    iframe.contentWindow.postMessage('{\"event\":\"listening\",\"id\":1}', '*'); "
+                            + "    window.isVideoPlaying = true; "
+                            + "  };"
+                            + "</script>"
+                            + "</body></html>";
 
-                    byte[] response = html.getBytes("UTF-8");
+                    byte[] response = html.getBytes(java.nio.charset.StandardCharsets.UTF_8);
                     exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
                     exchange.sendResponseHeaders(200, response.length);
-                    OutputStream os = exchange.getResponseBody();
-                    os.write(response);
-                    os.close();
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(response);
+                    }
                 }
             });
-            
+
             server.start();
-            System.out.println("Local video server started on port: " + serverPort);
+            System.out.println("🌐 Local video server started on port: " + serverPort);
         } catch (IOException e) {
+            System.err.println("❌ Failed to start local server: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -278,9 +321,9 @@ public class VideoPlayer extends StackPane {
     public void playVideo(String embedUrl) {
         this.setVisible(true);
         this.toFront();
-        this.requestFocus(); 
-        
-        // Reset volume state when a new video starts
+        this.requestFocus();
+
+        loadTimeout.stop();
         currentVolume = 100;
         isMuted = false;
 
@@ -288,22 +331,52 @@ public class VideoPlayer extends StackPane {
         loadingAnimation.reset();
         webView.setVisible(false);
 
-        String videoId = embedUrl;
-        if (videoId.contains("/embed/")) {
-            videoId = videoId.substring(videoId.indexOf("/embed/") + 7);
+        String videoId = extractVideoId(embedUrl);
+        if (videoId == null) {
+            loadingAnimation.showError();
+            System.err.println(
+                    "❌ Cannot play video: expected a YouTube embed URL or 11-character video ID"
+            );
+            return;
         }
-        if (videoId.contains("?")) {
-            videoId = videoId.substring(0, videoId.indexOf("?"));
+
+        if (server == null) {
+            loadingAnimation.showError();
+            System.err.println("❌ Cannot play video: local video server is unavailable");
+            return;
         }
-        currentVideoId = videoId;
+
+        System.out.println("🎬 Loading video ID: " + videoId);
 
         String localUrl = "http://127.0.0.1:" + serverPort + "/player?v=" + videoId;
+        System.out.println("🌍 Loading: " + localUrl);
         webEngine.load(localUrl);
+        loadTimeout.playFromStart();
     }
 
     public void stopVideo() {
+        loadTimeout.stop();
         webEngine.load("about:blank");
         this.setVisible(false);
+    }
+
+    private String extractVideoId(String embedUrl) {
+        if (embedUrl == null) {
+            return null;
+        }
+
+        String videoId = embedUrl.trim();
+        int embedIndex = videoId.indexOf("/embed/");
+        if (embedIndex >= 0) {
+            videoId = videoId.substring(embedIndex + "/embed/".length());
+        }
+
+        int queryIndex = videoId.indexOf('?');
+        if (queryIndex >= 0) {
+            videoId = videoId.substring(0, queryIndex);
+        }
+
+        return videoId.matches("[A-Za-z0-9_-]{11}") ? videoId : null;
     }
 
     private void sendYouTubeCommand(String command) {
@@ -311,19 +384,23 @@ public class VideoPlayer extends StackPane {
     }
 
     private void sendYouTubeCommand(String command, int arg) {
-        if (webEngine == null) return;
+        if (webEngine == null) {
+            return;
+        }
         try {
             String argsStr = arg >= 0 ? "[" + arg + "]" : "[]";
             String js = "var iframe = document.getElementById('player'); if(iframe && iframe.contentWindow) { "
-                      + "iframe.contentWindow.postMessage('{\"event\":\"command\",\"func\":\"" 
-                      + command + "\",\"args\":" + argsStr + "}', '*'); }";
+                    + "iframe.contentWindow.postMessage('{\"event\":\"command\",\"func\":\""
+                    + command + "\",\"args\":" + argsStr + "}', '*'); }";
             webEngine.executeScript(js);
         } catch (Exception e) {
-            System.out.println("YouTube command failed: " + command);
+            System.out.println("⚠️ YouTube command failed: " + command + " — " + e.getMessage());
         }
     }
 
     private void playClickSound() {
-        if (clickSound != null) clickSound.play();
+        if (clickSound != null) {
+            clickSound.play();
+        }
     }
 }
