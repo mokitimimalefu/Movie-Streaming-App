@@ -1,9 +1,10 @@
 module com.evc {
+    requires transitive javafx.graphics;
     requires javafx.controls;
     requires javafx.fxml;
     requires javafx.web;
     requires javafx.media;
-    
+
     // REQUIRED for the built-in Java HTTP server
     requires jdk.httpserver;
 

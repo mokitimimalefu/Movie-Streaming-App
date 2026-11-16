@@ -34,7 +34,7 @@ This is a JavaFX-based Movie Streaming Demo App inspired by Netflix, Disney+, an
   - `sounds/` (Hover and click sounds)
 
 ## How to Run
-1. Ensure you have Java 17+ and Maven installed.
+1. Ensure you have Java 25 (LTS) and Maven installed.
 2. Open the terminal in the root folder.
 3. Run `mvn clean compile` to download dependencies and compile.
 4. Run the app using `mvn javafx:run` or by clicking "Run" on `App.java` in your IDE.
