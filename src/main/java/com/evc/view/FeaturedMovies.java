@@ -4,18 +4,26 @@ import com.evc.model.Movie;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import java.util.function.Consumer;
 
 public class FeaturedMovies extends HBox {
     private VideoPlayer videoPlayer;
+    private final Consumer<Movie> onDownloadRequested;
 
     public FeaturedMovies(VideoPlayer videoPlayer) {
+        this(videoPlayer, ignored -> { });
+    }
+
+    public FeaturedMovies(VideoPlayer videoPlayer, Consumer<Movie> onDownloadRequested) {
         this.videoPlayer = videoPlayer;
+        this.onDownloadRequested = onDownloadRequested;
         this.setSpacing(20);
         this.setPadding(new Insets(20, 40, 20, 40));
         this.setAlignment(Pos.CENTER_LEFT);
@@ -57,17 +65,25 @@ public class FeaturedMovies extends HBox {
         Label info = new Label(movie.getYear() + "  ⭐ 8.5");
         info.getStyleClass().add("featured-info");
 
-        // SMALL button, on the LEFT, like your original
         IconButton watchBtn = new IconButton("/com/evc/images/icons/play.png", "Watch", true);
-        // Align it left
-        HBox btnRow = new HBox(watchBtn);
+        watchBtn.setOnMouseClicked(event -> {
+            videoPlayer.playVideo(movie);
+            event.consume();
+        });
+
+        Button downloadButton = new Button("Download");
+        downloadButton.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 6 14 6 14;");
+        downloadButton.setOnAction(event -> onDownloadRequested.accept(movie));
+        downloadButton.setOnMouseClicked(event -> event.consume());
+
+        HBox btnRow = new HBox(10, watchBtn, downloadButton);
         btnRow.setAlignment(Pos.CENTER_LEFT);
 
         content.getChildren().addAll(title, info, btnRow);
         StackPane.setAlignment(content, Pos.BOTTOM_LEFT);
 
         banner.getChildren().addAll(bgImage, gradient, content);
-        banner.setOnMouseClicked(e -> videoPlayer.playVideo(movie.getYoutubeEmbedUrl()));
+        banner.setOnMouseClicked(e -> videoPlayer.playVideo(movie));
         return banner;
     }
 }

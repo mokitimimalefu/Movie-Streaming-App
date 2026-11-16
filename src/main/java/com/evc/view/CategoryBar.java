@@ -9,9 +9,30 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 public class CategoryBar extends VBox {
     public CategoryBar(String categoryName, List<Movie> movies, VideoPlayer videoPlayer) {
+        this(categoryName, movies, videoPlayer, ignored -> false, ignored -> { });
+    }
+
+    public CategoryBar(
+            String categoryName,
+            List<Movie> movies,
+            VideoPlayer videoPlayer,
+            Predicate<Movie> isSaved,
+            Consumer<Movie> onSaveToggled) {
+        this(categoryName, movies, videoPlayer, isSaved, onSaveToggled, ignored -> { });
+    }
+
+    public CategoryBar(
+            String categoryName,
+            List<Movie> movies,
+            VideoPlayer videoPlayer,
+            Predicate<Movie> isSaved,
+            Consumer<Movie> onSaveToggled,
+            Consumer<Movie> onDownloadRequested) {
         this.setSpacing(10);
         this.setPadding(new Insets(10, 40, 20, 40));
 
@@ -21,7 +42,8 @@ public class CategoryBar extends VBox {
 
         HBox movieRow = new HBox(15);
         for (Movie movie : movies) {
-            movieRow.getChildren().add(new MovieCard(movie, videoPlayer));
+            movieRow.getChildren().add(
+                    new MovieCard(movie, videoPlayer, isSaved, onSaveToggled, onDownloadRequested));
         }
 
         ScrollPane scrollPane = new ScrollPane(movieRow);

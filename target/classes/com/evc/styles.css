@@ -51,3 +51,12 @@
     -fx-font-weight: bold;
     -fx-font-size: 14px;
 }
+
+.light-theme .header-logo-text { -fx-text-fill: #2563eb; }
+.light-theme .header-search-box { -fx-background-color: #e4e4e7; }
+.light-theme .header-search-box .text-field {
+    -fx-text-fill: #171717;
+    -fx-prompt-text-fill: #666666;
+}
+.light-theme .category-title,
+.light-theme .movie-card-title { -fx-text-fill: #171717; }

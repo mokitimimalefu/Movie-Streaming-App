@@ -20,6 +20,8 @@ import javafx.util.Duration;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.util.function.Consumer;
+import com.evc.model.Movie;
 
 public class VideoPlayer extends StackPane {
     private WebView webView;
@@ -30,6 +32,7 @@ public class VideoPlayer extends StackPane {
     private int serverPort;
     private PauseTransition loadTimeout;
     private final EventHandler<KeyEvent> keyEventHandler = this::handleKeyEvent;
+    private Consumer<Movie> onMoviePlayed = movie -> { };
 
     // State tracking for volume
     private int currentVolume = 100;
@@ -68,24 +71,24 @@ public class VideoPlayer extends StackPane {
         });
 
         webEngine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
-            System.out.println("📹 Load state changed: " + oldState + " → " + newState);
+            System.out.println("Load state changed: " + oldState + " → " + newState);
 
             if (newState == Worker.State.SUCCEEDED) {
                 loadTimeout.stop();
                 loadingAnimation.setVisible(false);
                 webView.setVisible(true);
                 this.requestFocus();
-                System.out.println("✅ Video page loaded successfully");
+                System.out.println("Video page loaded successfully");
             }
             if (newState == Worker.State.FAILED) {
                 loadTimeout.stop();
                 loadingAnimation.showError();
-                System.err.println("❌ Load failed: " + webEngine.getLoadWorker().getException());
+                System.err.println("Load failed: " + webEngine.getLoadWorker().getException());
             }
             if (newState == Worker.State.CANCELLED) {
                 loadTimeout.stop();
                 loadingAnimation.showError();
-                System.out.println("⚠️ Load was cancelled");
+                System.out.println("Load was cancelled");
             }
         });
 
@@ -215,7 +218,7 @@ public class VideoPlayer extends StackPane {
                             + "}";
             webEngine.executeScript(js);
         } catch (Exception e) {
-            System.out.println("⚠️ Toggle failed: " + e.getMessage());
+            System.out.println("Toggle failed: " + e.getMessage());
         }
     }
 
@@ -244,7 +247,7 @@ public class VideoPlayer extends StackPane {
                             + "}";
             webEngine.executeScript(js);
         } catch (Exception e) {
-            System.out.println("⚠️ Seek failed: " + e.getMessage());
+            System.out.println("Seek failed: " + e.getMessage());
         }
     }
 
@@ -311,9 +314,9 @@ public class VideoPlayer extends StackPane {
             });
 
             server.start();
-            System.out.println("🌐 Local video server started on port: " + serverPort);
+            System.out.println("Local video server started on port: " + serverPort);
         } catch (IOException e) {
-            System.err.println("❌ Failed to start local server: " + e.getMessage());
+            System.err.println("Failed to start local server: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -335,7 +338,7 @@ public class VideoPlayer extends StackPane {
         if (videoId == null) {
             loadingAnimation.showError();
             System.err.println(
-                    "❌ Cannot play video: expected a YouTube embed URL or 11-character video ID"
+                    "Cannot play video: expected a YouTube embed URL or 11-character video ID"
             );
             return;
         }
@@ -349,9 +352,24 @@ public class VideoPlayer extends StackPane {
         System.out.println("🎬 Loading video ID: " + videoId);
 
         String localUrl = "http://127.0.0.1:" + serverPort + "/player?v=" + videoId;
-        System.out.println("🌍 Loading: " + localUrl);
+        System.out.println("Loading: " + localUrl);
         webEngine.load(localUrl);
         loadTimeout.playFromStart();
+    }
+
+    public void playVideo(Movie movie) {
+        if (movie == null) {
+            return;
+        }
+        String embedUrl = movie.getYoutubeEmbedUrl();
+        if (server != null && extractVideoId(embedUrl) != null) {
+            onMoviePlayed.accept(movie);
+        }
+        playVideo(embedUrl);
+    }
+
+    public void setOnMoviePlayed(Consumer<Movie> callback) {
+        onMoviePlayed = callback == null ? movie -> { } : callback;
     }
 
     public void stopVideo() {
@@ -394,7 +412,7 @@ public class VideoPlayer extends StackPane {
                     + command + "\",\"args\":" + argsStr + "}', '*'); }";
             webEngine.executeScript(js);
         } catch (Exception e) {
-            System.out.println("⚠️ YouTube command failed: " + command + " — " + e.getMessage());
+            System.out.println("YouTube command failed: " + command + " — " + e.getMessage());
         }
     }
 

@@ -5,6 +5,7 @@ import javafx.animation.ScaleTransition;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.control.Label;
+import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
@@ -14,12 +15,31 @@ import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 public class MovieCard extends VBox {
     private static Map<String, AudioClip> categorySounds = new HashMap<>();
     private static AudioClip clickSound;
 
     public MovieCard(Movie movie, VideoPlayer videoPlayer) {
+        this(movie, videoPlayer, ignored -> false, ignored -> { });
+    }
+
+    public MovieCard(
+            Movie movie,
+            VideoPlayer videoPlayer,
+            Predicate<Movie> isSaved,
+            Consumer<Movie> onSaveToggled) {
+        this(movie, videoPlayer, isSaved, onSaveToggled, ignored -> { });
+    }
+
+    public MovieCard(
+            Movie movie,
+            VideoPlayer videoPlayer,
+            Predicate<Movie> isSaved,
+            Consumer<Movie> onSaveToggled,
+            Consumer<Movie> onDownloadRequested) {
         this.setAlignment(Pos.CENTER);
         this.setSpacing(5);
         this.setPrefWidth(180);
@@ -56,7 +76,25 @@ public class MovieCard extends VBox {
         title.setAlignment(Pos.CENTER);
         title.getStyleClass().add("movie-card-title");
 
-        this.getChildren().addAll(imageView, title);
+        Button saveButton = new Button();
+        saveButton.setMaxWidth(Double.MAX_VALUE);
+        saveButton.setStyle("-fx-background-color: #2a2a2a; -fx-text-fill: white; -fx-background-radius: 12;");
+        Runnable updateSaveButton = () -> saveButton.setText(
+                isSaved.test(movie) ? "Saved — Remove" : "+ Add to My List");
+        updateSaveButton.run();
+        saveButton.setOnAction(event -> {
+            onSaveToggled.accept(movie);
+            updateSaveButton.run();
+        });
+        saveButton.setOnMouseClicked(event -> event.consume());
+
+        Button downloadButton = new Button("Download");
+        downloadButton.setMaxWidth(Double.MAX_VALUE);
+        downloadButton.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-background-radius: 12;");
+        downloadButton.setOnAction(event -> onDownloadRequested.accept(movie));
+        downloadButton.setOnMouseClicked(event -> event.consume());
+
+        this.getChildren().addAll(imageView, title, saveButton, downloadButton);
 
         ScaleTransition scaleUp = new ScaleTransition(Duration.millis(200), this);
         scaleUp.setToX(1.1); scaleUp.setToY(1.1);
@@ -71,7 +109,7 @@ public class MovieCard extends VBox {
         this.setOnMouseExited(e -> scaleDown.playFromStart());
         this.setOnMouseClicked(e -> {
             if (clickSound != null) clickSound.play();
-            videoPlayer.playVideo(movie.getYoutubeEmbedUrl());
+            videoPlayer.playVideo(movie);
         });
     }
 

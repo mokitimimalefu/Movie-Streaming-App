@@ -15,6 +15,8 @@ import javafx.scene.text.FontWeight;
 import java.util.function.Consumer;
 
 public class Header extends HBox {
+    private TextField searchField;
+
     public Header() {
         this(query -> { });
     }
@@ -39,7 +41,7 @@ public class Header extends HBox {
         searchBox.getStyleClass().add("header-search-box");
         searchBox.setAlignment(Pos.CENTER);
         searchBox.setMaxWidth(400);
-        TextField searchField = new TextField();
+        searchField = new TextField();
         searchField.setPromptText("Search...");
         searchField.textProperty().addListener((observable, oldValue, newValue) ->
                 onSearchChanged.accept(newValue));
@@ -65,5 +67,9 @@ public class Header extends HBox {
         rightIcons.getChildren().addAll(bellIcon, bookmarkIcon);
 
         this.getChildren().addAll(logoBox, searchBox, spacer, rightIcons);
+    }
+
+    public void clearSearch() {
+        searchField.clear();
     }
 }
