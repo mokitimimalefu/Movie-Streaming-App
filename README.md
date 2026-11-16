@@ -12,12 +12,12 @@ This is a JavaFX-based Movie Streaming Demo App inspired by Netflix, Disney+, an
 - **Sound Effects:** Custom category-specific sounds play on hover. A click sound plays on buttons.
 - **Loading Animation:** A custom, pulsing "EVC" circle displays while the WebView loads.
 - **Custom Buttons:** No `javafx.scene.control.Button` class was used. All buttons are custom Labels with click events.
+- **Downloads:** "Add to Downloads" stores an in-app reference to a selected licensed video. The video itself stays in its original location and is not copied to the laptop's Downloads folder.
 
-## What Needs to be Fixed (For the next developer)
-1. **YouTube Video Playback:** 
-   - **Problem:** When a movie is clicked, the loading animation shows, but the YouTube video may fail to play or show a black screen.
-   - **Fix:** In `VideoPlayer.java`, we have added a Chrome `User-Agent` string to bypass YouTube's restrictions on embedded browsers. If it still fails, ensure the video IDs in `MovieData.java` are valid and allow embedding. Alternatively, check your internet connection and firewall.
-2. **UI Polish (Optional):**
+## Notes
+- Trailer playback uses YouTube embeds. If an individual trailer stops working, check that its video ID in `MovieData.java` is available and allows embedding. Playback can also be affected by internet connectivity or YouTube restrictions on embedded browsers.
+
+## Optional UI Polish
    - The "Settings" button in the sidebar currently does nothing. 
    - The Search bar in the header does not filter movies yet. You can implement an `onKeyTyped` listener to filter the `MovieData` Map.
    - Removed "Your Account" and Profile icon since there is no login system.

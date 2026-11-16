@@ -88,7 +88,7 @@ public class MovieCard extends VBox {
         });
         saveButton.setOnMouseClicked(event -> event.consume());
 
-        Button downloadButton = new Button("Download");
+        Button downloadButton = new Button("Add to Downloads");
         downloadButton.setMaxWidth(Double.MAX_VALUE);
         downloadButton.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-background-radius: 12;");
         downloadButton.setOnAction(event -> onDownloadRequested.accept(movie));

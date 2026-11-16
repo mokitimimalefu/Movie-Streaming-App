@@ -71,7 +71,7 @@ public class FeaturedMovies extends HBox {
             event.consume();
         });
 
-        Button downloadButton = new Button("Download");
+        Button downloadButton = new Button("Add to Downloads");
         downloadButton.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 6 14 6 14;");
         downloadButton.setOnAction(event -> onDownloadRequested.accept(movie));
         downloadButton.setOnMouseClicked(event -> event.consume());

@@ -30,7 +30,7 @@ public class MainController {
     private String currentScreen = "Categories";
     private String searchQuery = "";
     private final LicensedFileDownloads licensedDownloads = new LicensedFileDownloads(
-            Path.of(System.getProperty("user.home"), "Downloads", "EVC"));
+            Path.of(System.getProperty("user.home"), ".evc", "downloads.properties"));
     private final Map<String, Movie> watchHistory = new LinkedHashMap<>();
     private final Map<String, Movie> savedMovies = new LinkedHashMap<>();
 
@@ -194,25 +194,24 @@ public class MainController {
         Label title = new Label("Downloads");
         title.setStyle("-fx-text-fill: " + (AppSettings.isDarkMode() ? "#ffffff" : "#171717")
                 + "; -fx-font-size: 28px; -fx-font-weight: bold;");
-        Label location = new Label("Licensed video files are copied to: "
-                + licensedDownloads.getDownloadDirectory());
+        Label location = new Label("This is an in-app list. Videos stay in their original locations and are not copied.");
         location.setStyle("-fx-text-fill: " + (AppSettings.isDarkMode() ? "#aaaaaa" : "#555555")
                 + "; -fx-font-size: 14px;");
         box.getChildren().addAll(title, location);
 
         try {
-            List<Path> downloadedFiles = licensedDownloads.listDownloadedFiles();
+            List<LicensedFileDownloads.DownloadEntry> downloadedFiles = licensedDownloads.listDownloadedFiles();
             if (downloadedFiles.isEmpty()) {
                 Label emptyMessage = new Label("No video files have been added yet.");
                 emptyMessage.setStyle("-fx-text-fill: " + (AppSettings.isDarkMode() ? "#aaaaaa" : "#555555")
                         + "; -fx-font-size: 16px;");
                 box.getChildren().add(emptyMessage);
             } else {
-                for (Path file : downloadedFiles) {
-                    Label fileName = new Label(file.getFileName().toString());
+                for (LicensedFileDownloads.DownloadEntry file : downloadedFiles) {
+                    Label fileName = new Label(file.title());
                     fileName.setStyle("-fx-text-fill: " + (AppSettings.isDarkMode() ? "#ffffff" : "#171717")
                             + "; -fx-font-size: 15px; -fx-font-weight: bold;");
-                    Label filePath = new Label(file.toString());
+                    Label filePath = new Label(file.sourcePath().toString());
                     filePath.setStyle("-fx-text-fill: " + (AppSettings.isDarkMode() ? "#aaaaaa" : "#555555")
                             + "; -fx-font-size: 12px;");
                     VBox fileDetails = new VBox(4, fileName, filePath);
@@ -224,7 +223,7 @@ public class MainController {
                 }
             }
         } catch (IOException e) {
-            Label error = new Label("Could not read the Downloads folder: " + e.getMessage());
+            Label error = new Label("Could not read the in-app Downloads list: " + e.getMessage());
             error.setStyle("-fx-text-fill: #ff6b6b; -fx-font-size: 14px;");
             box.getChildren().add(error);
         }
@@ -233,7 +232,8 @@ public class MainController {
 
     private void downloadLicensedFile(Movie movie) {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Choose a licensed video file for " + movie.getTitle());
+        chooser.setTitle("Add a licensed video file for " + movie.getTitle()
+                + " (the file will not be copied)");
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
                 "Video files", "*.avi", "*.m4v", "*.mkv", "*.mov", "*.mp4", "*.mpeg", "*.mpg", "*.webm", "*.wmv"));
 
@@ -242,24 +242,25 @@ public class MainController {
             return;
         }
 
-        Task<Path> task = new Task<>() {
+        Task<LicensedFileDownloads.DownloadEntry> task = new Task<>() {
             @Override
-            protected Path call() throws IOException {
-                return licensedDownloads.importLicensedFile(source.toPath(), movie.getTitle());
+            protected LicensedFileDownloads.DownloadEntry call() throws IOException {
+                return licensedDownloads.addLicensedFileReference(source.toPath(), movie.getTitle());
             }
         };
         task.setOnSucceeded(event -> {
             if (currentScreen.equals("Downloads")) {
                 renderCurrentScreen();
             }
-            showDownloadAlert(Alert.AlertType.INFORMATION, "Download complete",
-                    "The licensed video was copied to:\n" + task.getValue());
+            showDownloadAlert(Alert.AlertType.INFORMATION, "Added to Downloads",
+                    "The video was added to your in-app list. The original file was not copied:\n"
+                            + task.getValue().sourcePath());
         });
-        task.setOnFailed(event -> showDownloadAlert(Alert.AlertType.ERROR, "Download failed",
-                task.getException() == null ? "The video file could not be copied."
+        task.setOnFailed(event -> showDownloadAlert(Alert.AlertType.ERROR, "Could not add video",
+                task.getException() == null ? "The video could not be added to the in-app list."
                         : task.getException().getMessage()));
 
-        Thread worker = new Thread(task, "evc-licensed-file-download");
+        Thread worker = new Thread(task, "evc-download-library-update");
         worker.setDaemon(true);
         worker.start();
     }
