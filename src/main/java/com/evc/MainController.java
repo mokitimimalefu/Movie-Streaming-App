@@ -2,17 +2,11 @@ package com.evc;
 
 import com.evc.model.MovieData;
 import com.evc.view.*;
-import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.*;
-import javafx.stage.FileChooser;
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
@@ -27,10 +21,8 @@ public class MainController {
     private VideoPlayer videoPlayer;
     private Sidebar sidebar;
     private Header header;
-    private String currentScreen = "Categories";
+    private String currentScreen = "Home";
     private String searchQuery = "";
-    private final LicensedFileDownloads licensedDownloads = new LicensedFileDownloads(
-            Path.of(System.getProperty("user.home"), ".evc", "downloads.properties"));
     private final Map<String, Movie> watchHistory = new LinkedHashMap<>();
     private final Map<String, Movie> savedMovies = new LinkedHashMap<>();
 
@@ -61,10 +53,22 @@ public class MainController {
         mainLayout.setLeft(sidebar);
 
         applyTheme();
-        showScreen("Categories");
+        showScreen("Home");
+
+        absoluteRoot.widthProperty().addListener((observable, oldWidth, newWidth) ->
+                updateResponsiveLayout(newWidth.doubleValue()));
 
         absoluteRoot.getChildren().addAll(mainLayout, videoPlayer);
         return absoluteRoot;
+    }
+
+    private void updateResponsiveLayout(double width) {
+        if (sidebar != null) {
+            sidebar.setCompact(width < 900);
+        }
+        if (header != null) {
+            header.setCompact(width < 700);
+        }
     }
 
     private void showScreen(String screenName) {
@@ -84,7 +88,7 @@ public class MainController {
 
     private void renderCurrentScreen() {
         VBox contentBox = new VBox(20);
-        contentBox.setPadding(new Insets(0, 0, 50, 40));
+        contentBox.setPadding(new Insets(0, 24, 50, 24));
 
         Map<String, List<Movie>> categories = MovieData.getCategorizedMovies();
 
@@ -115,15 +119,18 @@ public class MainController {
             }
         }
         else if (currentScreen.equals("Home") || currentScreen.equals("Categories")) {
-            contentBox.getChildren().add(new FeaturedMovies(videoPlayer, this::downloadLicensedFile));
+            List<Movie> trendingMovies = getTrendingMovies(categories);
+            if (!trendingMovies.isEmpty()) {
+                contentBox.getChildren().add(createCategoryBar("Trending Now", trendingMovies));
+            }
             for (Map.Entry<String, List<Movie>> entry : categories.entrySet()) {
                 contentBox.getChildren().add(createCategoryBar(entry.getKey(), entry.getValue()));
             }
         }
         else if (currentScreen.equals("Trending")) {
-            List<Movie> actions = categories.get("Action");
-            if (actions != null && !actions.isEmpty()) {
-                contentBox.getChildren().add(createCategoryBar("Trending Now", actions));
+            List<Movie> trendingMovies = getTrendingMovies(categories);
+            if (!trendingMovies.isEmpty()) {
+                contentBox.getChildren().add(createCategoryBar("Trending Now", trendingMovies));
             } else {
                 Label error = new Label("No trending movies are available.");
                 error.setStyle("-fx-text-fill: #ff6b6b; -fx-font-size: 16px; -fx-padding: 50px;");
@@ -132,9 +139,6 @@ public class MainController {
         }
         else if (currentScreen.equals("Coming Soon")) {
             contentBox.getChildren().add(createPlaceholder("Coming Soon", "New movies and trailers will be added here soon."));
-        }
-        else if (currentScreen.equals("Downloads")) {
-            contentBox.getChildren().add(createDownloadsScreen());
         }
         else if (currentScreen.equals("Settings")) {
             contentBox.getChildren().add(createSettingsScreen());
@@ -148,6 +152,21 @@ public class MainController {
         scrollPane.setFitToWidth(true);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         mainLayout.setCenter(scrollPane);
+    }
+
+    private List<Movie> getTrendingMovies(Map<String, List<Movie>> categories) {
+        List<Movie> trendingMovies = new ArrayList<>();
+        Map<String, Integer> selectedCounts = new LinkedHashMap<>();
+        String[] trendingCategories = {"Action", "Comedy", "Sci-Fi", "Action", "Sci-Fi"};
+        for (String categoryName : trendingCategories) {
+            List<Movie> categoryMovies = categories.get(categoryName);
+            int movieIndex = selectedCounts.getOrDefault(categoryName, 0);
+            if (categoryMovies != null && movieIndex < categoryMovies.size()) {
+                trendingMovies.add(categoryMovies.get(movieIndex));
+                selectedCounts.put(categoryName, movieIndex + 1);
+            }
+        }
+        return trendingMovies;
     }
 
     private void addCollection(VBox contentBox, String title, List<Movie> movies, String emptyMessage) {
@@ -185,95 +204,7 @@ public class MainController {
                     if (currentScreen.equals("Saved") || currentScreen.equals("My Library")) {
                         renderCurrentScreen();
                     }
-                },
-                this::downloadLicensedFile);
-    }
-
-    private VBox createDownloadsScreen() {
-        VBox box = new VBox(16);
-        Label title = new Label("Downloads");
-        title.setStyle("-fx-text-fill: " + (AppSettings.isDarkMode() ? "#ffffff" : "#171717")
-                + "; -fx-font-size: 28px; -fx-font-weight: bold;");
-        Label location = new Label("This is an in-app list. Videos stay in their original locations and are not copied.");
-        location.setStyle("-fx-text-fill: " + (AppSettings.isDarkMode() ? "#aaaaaa" : "#555555")
-                + "; -fx-font-size: 14px;");
-        box.getChildren().addAll(title, location);
-
-        try {
-            List<LicensedFileDownloads.DownloadEntry> downloadedFiles = licensedDownloads.listDownloadedFiles();
-            if (downloadedFiles.isEmpty()) {
-                Label emptyMessage = new Label("No video files have been added yet.");
-                emptyMessage.setStyle("-fx-text-fill: " + (AppSettings.isDarkMode() ? "#aaaaaa" : "#555555")
-                        + "; -fx-font-size: 16px;");
-                box.getChildren().add(emptyMessage);
-            } else {
-                for (LicensedFileDownloads.DownloadEntry file : downloadedFiles) {
-                    Label fileName = new Label(file.title());
-                    fileName.setStyle("-fx-text-fill: " + (AppSettings.isDarkMode() ? "#ffffff" : "#171717")
-                            + "; -fx-font-size: 15px; -fx-font-weight: bold;");
-                    Label filePath = new Label(file.sourcePath().toString());
-                    filePath.setStyle("-fx-text-fill: " + (AppSettings.isDarkMode() ? "#aaaaaa" : "#555555")
-                            + "; -fx-font-size: 12px;");
-                    VBox fileDetails = new VBox(4, fileName, filePath);
-                    fileDetails.setPadding(new Insets(12));
-                    fileDetails.setStyle("-fx-background-color: "
-                            + (AppSettings.isDarkMode() ? "#1f1f1f" : "#e4e4e7")
-                            + "; -fx-background-radius: 6;");
-                    box.getChildren().add(fileDetails);
-                }
-            }
-        } catch (IOException e) {
-            Label error = new Label("Could not read the in-app Downloads list: " + e.getMessage());
-            error.setStyle("-fx-text-fill: #ff6b6b; -fx-font-size: 14px;");
-            box.getChildren().add(error);
-        }
-        return box;
-    }
-
-    private void downloadLicensedFile(Movie movie) {
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Add a licensed video file for " + movie.getTitle()
-                + " (the file will not be copied)");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
-                "Video files", "*.avi", "*.m4v", "*.mkv", "*.mov", "*.mp4", "*.mpeg", "*.mpg", "*.webm", "*.wmv"));
-
-        File source = chooser.showOpenDialog(rootLayout.getScene().getWindow());
-        if (source == null) {
-            return;
-        }
-
-        Task<LicensedFileDownloads.DownloadEntry> task = new Task<>() {
-            @Override
-            protected LicensedFileDownloads.DownloadEntry call() throws IOException {
-                return licensedDownloads.addLicensedFileReference(source.toPath(), movie.getTitle());
-            }
-        };
-        task.setOnSucceeded(event -> {
-            if (currentScreen.equals("Downloads")) {
-                renderCurrentScreen();
-            }
-            showDownloadAlert(Alert.AlertType.INFORMATION, "Added to Downloads",
-                    "The video was added to your in-app list. The original file was not copied:\n"
-                            + task.getValue().sourcePath());
-        });
-        task.setOnFailed(event -> showDownloadAlert(Alert.AlertType.ERROR, "Could not add video",
-                task.getException() == null ? "The video could not be added to the in-app list."
-                        : task.getException().getMessage()));
-
-        Thread worker = new Thread(task, "evc-download-library-update");
-        worker.setDaemon(true);
-        worker.start();
-    }
-
-    private void showDownloadAlert(Alert.AlertType type, String title, String message) {
-        Alert alert = new Alert(type);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        if (rootLayout.getScene() != null) {
-            alert.initOwner(rootLayout.getScene().getWindow());
-        }
-        alert.show();
+                });
     }
 
     private boolean movieMatches(Movie movie, String query) {
@@ -304,7 +235,7 @@ public class MainController {
         settingsBox.setMaxWidth(600);
 
         Label section1 = new Label("Appearance");
-        section1.setStyle("-fx-text-fill: #3b82f6; -fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 10 0 5 0;");
+        section1.setStyle("-fx-text-fill: #e50914; -fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 10 0 5 0;");
 
         HBox darkModeRow = new HBox(15);
         darkModeRow.setAlignment(Pos.CENTER_LEFT);
@@ -338,7 +269,7 @@ public class MainController {
         langRow.getChildren().addAll(langLabel, langSpacer, langValue);
 
         Label section2 = new Label("Playback");
-        section2.setStyle("-fx-text-fill: #3b82f6; -fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 20 0 5 0;");
+        section2.setStyle("-fx-text-fill: #e50914; -fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 20 0 5 0;");
 
         HBox autoPlayRow = new HBox(15);
         autoPlayRow.setAlignment(Pos.CENTER_LEFT);

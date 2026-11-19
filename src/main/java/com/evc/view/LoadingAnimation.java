@@ -24,7 +24,7 @@ public class LoadingAnimation extends StackPane {
 
         Arc spinner = new Arc(0, 0, 45, 45, 90, 270);
         spinner.setFill(Color.TRANSPARENT);
-        spinner.setStroke(Color.web("#3b82f6"));
+        spinner.setStroke(Color.web("#e50914"));
         spinner.setStrokeWidth(6);
         spinner.setStrokeLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
 

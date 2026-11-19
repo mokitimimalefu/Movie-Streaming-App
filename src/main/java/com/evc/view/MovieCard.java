@@ -4,8 +4,8 @@ import com.evc.model.Movie;
 import javafx.animation.ScaleTransition;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
-import javafx.scene.control.Label;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
@@ -14,9 +14,10 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.function.Consumer;
 
 public class MovieCard extends VBox {
     private static Map<String, AudioClip> categorySounds = new HashMap<>();
@@ -31,7 +32,7 @@ public class MovieCard extends VBox {
             VideoPlayer videoPlayer,
             Predicate<Movie> isSaved,
             Consumer<Movie> onSaveToggled) {
-        this(movie, videoPlayer, isSaved, onSaveToggled, ignored -> { });
+        this(movie, videoPlayer, isSaved, onSaveToggled, List.of(movie));
     }
 
     public MovieCard(
@@ -39,10 +40,16 @@ public class MovieCard extends VBox {
             VideoPlayer videoPlayer,
             Predicate<Movie> isSaved,
             Consumer<Movie> onSaveToggled,
-            Consumer<Movie> onDownloadRequested) {
+            List<Movie> playlist) {
         this.setAlignment(Pos.CENTER);
         this.setSpacing(5);
         this.setPrefWidth(180);
+        this.setMinWidth(180);
+        this.setMaxWidth(180);
+        this.setPrefHeight(349);
+        this.setMinHeight(349);
+        this.setMaxHeight(349);
+        this.getStyleClass().add("movie-card");
         this.setCursor(Cursor.HAND);
 
         if (categorySounds.isEmpty()) {
@@ -74,11 +81,17 @@ public class MovieCard extends VBox {
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
         title.setWrapText(true);
         title.setAlignment(Pos.CENTER);
+        title.setPrefHeight(40);
+        title.setMinHeight(40);
+        title.setMaxHeight(40);
         title.getStyleClass().add("movie-card-title");
 
         Button saveButton = new Button();
         saveButton.setMaxWidth(Double.MAX_VALUE);
-        saveButton.setStyle("-fx-background-color: #2a2a2a; -fx-text-fill: white; -fx-background-radius: 12;");
+        saveButton.setPrefHeight(34);
+        saveButton.setMinHeight(34);
+        saveButton.setMaxHeight(34);
+        saveButton.setStyle("-fx-background-color: #e50914; -fx-text-fill: white; -fx-background-radius: 12;");
         Runnable updateSaveButton = () -> saveButton.setText(
                 isSaved.test(movie) ? "Saved — Remove" : "+ Add to My List");
         updateSaveButton.run();
@@ -88,13 +101,7 @@ public class MovieCard extends VBox {
         });
         saveButton.setOnMouseClicked(event -> event.consume());
 
-        Button downloadButton = new Button("Add to Downloads");
-        downloadButton.setMaxWidth(Double.MAX_VALUE);
-        downloadButton.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-background-radius: 12;");
-        downloadButton.setOnAction(event -> onDownloadRequested.accept(movie));
-        downloadButton.setOnMouseClicked(event -> event.consume());
-
-        this.getChildren().addAll(imageView, title, saveButton, downloadButton);
+        this.getChildren().addAll(imageView, title, saveButton);
 
         ScaleTransition scaleUp = new ScaleTransition(Duration.millis(200), this);
         scaleUp.setToX(1.1); scaleUp.setToY(1.1);
@@ -109,7 +116,7 @@ public class MovieCard extends VBox {
         this.setOnMouseExited(e -> scaleDown.playFromStart());
         this.setOnMouseClicked(e -> {
             if (clickSound != null) clickSound.play();
-            videoPlayer.playVideo(movie);
+            videoPlayer.playVideo(movie, playlist);
         });
     }
 

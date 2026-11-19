@@ -23,18 +23,8 @@ public class CategoryBar extends VBox {
             VideoPlayer videoPlayer,
             Predicate<Movie> isSaved,
             Consumer<Movie> onSaveToggled) {
-        this(categoryName, movies, videoPlayer, isSaved, onSaveToggled, ignored -> { });
-    }
-
-    public CategoryBar(
-            String categoryName,
-            List<Movie> movies,
-            VideoPlayer videoPlayer,
-            Predicate<Movie> isSaved,
-            Consumer<Movie> onSaveToggled,
-            Consumer<Movie> onDownloadRequested) {
         this.setSpacing(10);
-        this.setPadding(new Insets(10, 40, 20, 40));
+        this.setPadding(new Insets(10, 0, 20, 0));
 
         Label title = new Label(categoryName);
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 20));
@@ -43,14 +33,17 @@ public class CategoryBar extends VBox {
         HBox movieRow = new HBox(15);
         for (Movie movie : movies) {
             movieRow.getChildren().add(
-                    new MovieCard(movie, videoPlayer, isSaved, onSaveToggled, onDownloadRequested));
+                    new MovieCard(movie, videoPlayer, isSaved, onSaveToggled, movies));
         }
 
         ScrollPane scrollPane = new ScrollPane(movieRow);
+        scrollPane.getStyleClass().add("category-scroll");
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scrollPane.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
         scrollPane.setFitToHeight(true);
+        scrollPane.setMinWidth(0);
+        scrollPane.setPrefViewportWidth(960);
         scrollPane.setPrefWidth(960);
         scrollPane.setMaxWidth(960);
 

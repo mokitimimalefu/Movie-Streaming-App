@@ -16,6 +16,9 @@ import java.util.function.Consumer;
 
 public class Header extends HBox {
     private TextField searchField;
+    private HBox logoBox;
+    private HBox searchBox;
+    private Label subText;
 
     public Header() {
         this(query -> { });
@@ -27,17 +30,17 @@ public class Header extends HBox {
         this.setPadding(new Insets(15, 30, 15, 30));
         this.setSpacing(30);
 
-        HBox logoBox = new HBox(10);
+        logoBox = new HBox(10);
         logoBox.setAlignment(Pos.CENTER_LEFT);
         Label logoText = new Label("EVC");
         logoText.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
         logoText.getStyleClass().add("header-logo-text");
-        Label subText = new Label("E-Video Cloud");
+        subText = new Label("E-Video Cloud");
         subText.setFont(Font.font("Segoe UI", FontWeight.NORMAL, 10));
         subText.setTextFill(Color.WHITE);
         logoBox.getChildren().addAll(logoText, subText);
 
-        HBox searchBox = new HBox();
+        searchBox = new HBox();
         searchBox.getStyleClass().add("header-search-box");
         searchBox.setAlignment(Pos.CENTER);
         searchBox.setMaxWidth(400);
@@ -48,7 +51,7 @@ public class Header extends HBox {
         searchField.setOnAction(event -> onSearchChanged.accept(searchField.getText()));
         HBox.setHgrow(searchField, Priority.ALWAYS);
         Label searchIcon = new Label("🔍");
-        searchIcon.setTextFill(Color.web("#3b82f6"));
+        searchIcon.setTextFill(Color.web("#e50914"));
         searchIcon.setCursor(Cursor.HAND);
         searchIcon.setOnMouseClicked(event -> onSearchChanged.accept(searchField.getText()));
         searchBox.getChildren().addAll(searchField, searchIcon);
@@ -56,20 +59,22 @@ public class Header extends HBox {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox rightIcons = new HBox(20);
-        rightIcons.setAlignment(Pos.CENTER_RIGHT);
-        Label bellIcon = new Label("🔔");
-        bellIcon.setTextFill(Color.web("#a0a0a0"));
-        bellIcon.setCursor(Cursor.HAND);
-        Label bookmarkIcon = new Label("🔖");
-        bookmarkIcon.setTextFill(Color.web("#a0a0a0"));
-        bookmarkIcon.setCursor(Cursor.HAND);
-        rightIcons.getChildren().addAll(bellIcon, bookmarkIcon);
+        
 
-        this.getChildren().addAll(logoBox, searchBox, spacer, rightIcons);
+        this.getChildren().addAll(logoBox, searchBox, spacer);
     }
 
     public void clearSearch() {
         searchField.clear();
+    }
+
+    public void setCompact(boolean compact) {
+        subText.setVisible(!compact);
+        subText.setManaged(!compact);
+        this.setPadding(compact
+                ? new Insets(10, 16, 10, 16)
+                : new Insets(15, 30, 15, 30));
+        this.setSpacing(compact ? 12 : 30);
+        searchBox.setMaxWidth(compact ? 280 : 500);
     }
 }

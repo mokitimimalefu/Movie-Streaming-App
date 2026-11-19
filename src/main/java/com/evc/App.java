@@ -16,6 +16,8 @@ public class App extends Application {
 
         primaryStage.setTitle("EVC - E-Video Cloud");
         primaryStage.setScene(scene);
+        primaryStage.setMinWidth(640);
+        primaryStage.setMinHeight(480);
         primaryStage.setMaximized(true);
         primaryStage.show();
         

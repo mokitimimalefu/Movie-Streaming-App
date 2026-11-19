@@ -4,48 +4,55 @@ import com.evc.model.Movie;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
-import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
-import java.util.function.Consumer;
 
-public class FeaturedMovies extends HBox {
+public class FeaturedMovies extends FlowPane {
     private VideoPlayer videoPlayer;
-    private final Consumer<Movie> onDownloadRequested;
 
     public FeaturedMovies(VideoPlayer videoPlayer) {
-        this(videoPlayer, ignored -> { });
-    }
-
-    public FeaturedMovies(VideoPlayer videoPlayer, Consumer<Movie> onDownloadRequested) {
         this.videoPlayer = videoPlayer;
-        this.onDownloadRequested = onDownloadRequested;
-        this.setSpacing(20);
-        this.setPadding(new Insets(20, 40, 20, 40));
-        this.setAlignment(Pos.CENTER_LEFT);
+        this.setHgap(16);
+        this.setVgap(16);
+        this.setPadding(new Insets(20, 0, 20, 0));
+        this.setAlignment(Pos.TOP_LEFT);
+        this.setPrefWrapLength(900);
 
         Movie f1 = new Movie("Pacific Rim", "2013", "Action", "/com/evc/images/posters/pacific-rim.jpg", "5GUYJT9YDZk");
         Movie f2 = new Movie("The Batman", "2022", "Action", "/com/evc/images/posters/batman.jpg", "mqqft2x_Aa4");
-        this.getChildren().addAll(createBanner(f1), createBanner(f2));
+        StackPane first = createBanner(f1);
+        StackPane second = createBanner(f2);
+        this.getChildren().addAll(first, second);
+        this.widthProperty().addListener((observable, oldWidth, newWidth) -> {
+            double width = newWidth.doubleValue();
+            double bannerWidth = width < 760
+                    ? Math.max(280, width)
+                    : Math.max(280, (width - 16) / 2);
+            first.setPrefWidth(bannerWidth);
+            second.setPrefWidth(bannerWidth);
+        });
     }
 
     private StackPane createBanner(Movie movie) {
         StackPane banner = new StackPane();
         banner.getStyleClass().add("featured-banner");
-        banner.setPrefSize(500, 280);
+        banner.setPrefHeight(280);
+        banner.setMinHeight(220);
         banner.setCursor(Cursor.HAND);
 
         ImageView bgImage = new ImageView();
         try {
             Image img = new Image(getClass().getResourceAsStream(movie.getImagePath()));
             bgImage.setImage(img);
-            bgImage.setFitWidth(500);
+            bgImage.fitWidthProperty().bind(banner.widthProperty());
             bgImage.setFitHeight(280);
-            javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle(500, 280);
+            javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle();
+            clip.widthProperty().bind(banner.widthProperty());
+            clip.heightProperty().bind(banner.heightProperty());
             clip.setArcWidth(30); clip.setArcHeight(30);
             bgImage.setClip(clip);
         } catch (Exception e) {}
@@ -71,15 +78,7 @@ public class FeaturedMovies extends HBox {
             event.consume();
         });
 
-        Button downloadButton = new Button("Add to Downloads");
-        downloadButton.setStyle("-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 6 14 6 14;");
-        downloadButton.setOnAction(event -> onDownloadRequested.accept(movie));
-        downloadButton.setOnMouseClicked(event -> event.consume());
-
-        HBox btnRow = new HBox(10, watchBtn, downloadButton);
-        btnRow.setAlignment(Pos.CENTER_LEFT);
-
-        content.getChildren().addAll(title, info, btnRow);
+        content.getChildren().addAll(title, info, watchBtn);
         StackPane.setAlignment(content, Pos.BOTTOM_LEFT);
 
         banner.getChildren().addAll(bgImage, gradient, content);

@@ -22,6 +22,7 @@ public class Sidebar extends VBox {
     private final List<MenuItem> menuItems = new ArrayList<>();
     private MenuItem currentActiveItem;
     private boolean darkMode = true;
+    private boolean compact = false;
 
     public Sidebar() {
         this.getStyleClass().add("sidebar");
@@ -33,8 +34,7 @@ public class Sidebar extends VBox {
         topMenu.getChildren().addAll(
                 createMenuItem("Home"),
                 createMenuItem("Trending"),
-                createMenuItem("Coming Soon"),
-                createMenuItem("Categories")
+                createMenuItem("Coming Soon")
         );
 
         Region spacer = new Region();
@@ -45,8 +45,7 @@ public class Sidebar extends VBox {
         libraryMenu.getChildren().addAll(
                 createMenuItem("History"),
                 createMenuItem("Saved"),
-                createMenuItem("My Library"),
-                createMenuItem("Downloads")
+                createMenuItem("My Library")
         );
 
         VBox bottomMenu = new VBox(10);
@@ -55,7 +54,7 @@ public class Sidebar extends VBox {
         this.getChildren().addAll(topMenu, libraryMenu, spacer, bottomMenu);
 
         // Set the default active screen
-        setActive("Categories");
+        setActive("Home");
     }
 
     public void setOnMenuItemClicked(Consumer<String> callback) {
@@ -66,6 +65,26 @@ public class Sidebar extends VBox {
         this.darkMode = darkMode;
         this.setStyle("-fx-background-color: " + (darkMode ? "#0f0f0f" : "#e4e4e7") + ";");
         setActive(currentActiveItem == null ? "" : currentActiveItem.text);
+    }
+
+    public void setCompact(boolean compact) {
+        if (this.compact == compact) {
+            return;
+        }
+        this.compact = compact;
+        this.setPrefWidth(compact ? 72 : 220);
+        this.setMinWidth(compact ? 72 : 220);
+        this.setMaxWidth(compact ? 72 : 220);
+        for (MenuItem item : menuItems) {
+            item.label.setVisible(!compact);
+            item.label.setManaged(!compact);
+            item.line.setVisible(!compact);
+            item.line.setManaged(!compact);
+            item.container.setAlignment(compact ? Pos.CENTER : Pos.CENTER_LEFT);
+            item.container.setPadding(compact
+                    ? new Insets(12, 8, 12, 8)
+                    : new Insets(10, 20, 10, 20));
+        }
     }
 
     private HBox createMenuItem(String text) {
@@ -129,8 +148,8 @@ public class Sidebar extends VBox {
 
             if (isTarget) {
                 currentActiveItem = mi;
-                mi.line.setStyle("-fx-background-color: #3b82f6;");
-                mi.icon.setTextFill(Color.web("#3b82f6"));
+                mi.line.setStyle("-fx-background-color: #e50914;");
+                mi.icon.setTextFill(Color.web("#e50914"));
                 mi.label.setTextFill(darkMode ? Color.WHITE : Color.web("#171717"));
                 mi.container.setStyle("-fx-background-color: transparent;"); // Clear hover
             } else {

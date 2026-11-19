@@ -1,5 +1,7 @@
 package com.evc.view;
 
+import com.evc.AppSettings;
+import com.evc.model.Movie;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -20,8 +22,9 @@ import javafx.util.Duration;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
-import com.evc.model.Movie;
 
 public class VideoPlayer extends StackPane {
     private WebView webView;
@@ -165,7 +168,7 @@ public class VideoPlayer extends StackPane {
                 }
                 currentVolume = Math.min(100, currentVolume + 10);
                 sendYouTubeCommand("setVolume", currentVolume);
-                System.out.println("🔊 Volume: " + currentVolume + "%");
+                System.out.println("Volume: " + currentVolume + "%");
                 event.consume();
                 break;
             case DOWN:
@@ -175,18 +178,18 @@ public class VideoPlayer extends StackPane {
                 }
                 currentVolume = Math.max(0, currentVolume - 10);
                 sendYouTubeCommand("setVolume", currentVolume);
-                System.out.println("🔉 Volume: " + currentVolume + "%");
+                System.out.println("Volume: " + currentVolume + "%");
                 event.consume();
                 break;
             case M:
                 if (isMuted) {
                     sendYouTubeCommand("unMute");
                     isMuted = false;
-                    System.out.println("🔊 Unmuted");
+                    System.out.println("Unmuted");
                 } else {
                     sendYouTubeCommand("mute");
                     isMuted = true;
-                    System.out.println("🔇 Muted");
+                    System.out.println("Muted");
                 }
                 event.consume();
                 break;
@@ -280,6 +283,19 @@ public class VideoPlayer extends StackPane {
                         return;
                     }
 
+                    String playlistIds = "";
+                    if (query != null) {
+                        for (String parameter : query.split("&")) {
+                            if (parameter.startsWith("playlist=")) {
+                                String candidate = parameter.substring("playlist=".length());
+                                if (candidate.matches("[A-Za-z0-9_-]{11}(,[A-Za-z0-9_-]{11})*")) {
+                                    playlistIds = candidate;
+                                }
+                                break;
+                            }
+                        }
+                    }
+
                     String html = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
                             + "<style>"
                             + "  body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }"
@@ -290,9 +306,12 @@ public class VideoPlayer extends StackPane {
                             + "<div class='video-container'>"
                             + "<iframe id='player' "
                             + "src='https://www.youtube.com/embed/" + videoId
-                            + "?autoplay=1&enablejsapi=1&rel=0&modestbranding=1&playsinline=1&origin=http://127.0.0.1:"
+                            + "?autoplay=1&enablejsapi=1&rel=0&modestbranding=1&playsinline=1"
+                            + (playlistIds.isEmpty() ? "" : "&playlist=" + playlistIds)
+                            + "&origin=http://127.0.0.1:"
                             + serverPort + "' "
-                            + "frameborder='0' allow='autoplay; encrypted-media; picture-in-picture' allowfullscreen></iframe>"
+                            + "frameborder='0' referrerpolicy='strict-origin-when-cross-origin' "
+                            + "allow='autoplay; encrypted-media; picture-in-picture' allowfullscreen></iframe>"
                             + "</div>"
                             + "<script>"
                             + "  window.onload = function() { "
@@ -306,6 +325,8 @@ public class VideoPlayer extends StackPane {
 
                     byte[] response = html.getBytes(java.nio.charset.StandardCharsets.UTF_8);
                     exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+                    exchange.getResponseHeaders().set(
+                            "Referrer-Policy", "strict-origin-when-cross-origin");
                     exchange.sendResponseHeaders(200, response.length);
                     try (OutputStream os = exchange.getResponseBody()) {
                         os.write(response);
@@ -322,6 +343,10 @@ public class VideoPlayer extends StackPane {
     }
 
     public void playVideo(String embedUrl) {
+        playVideo(embedUrl, "");
+    }
+
+    private void playVideo(String embedUrl, String playlistIds) {
         this.setVisible(true);
         this.toFront();
         this.requestFocus();
@@ -345,13 +370,16 @@ public class VideoPlayer extends StackPane {
 
         if (server == null) {
             loadingAnimation.showError();
-            System.err.println("❌ Cannot play video: local video server is unavailable");
+            System.err.println("Cannot play video: local video server is unavailable");
             return;
         }
 
-        System.out.println("🎬 Loading video ID: " + videoId);
+        System.out.println("Loading video ID: " + videoId);
 
         String localUrl = "http://127.0.0.1:" + serverPort + "/player?v=" + videoId;
+        if (!playlistIds.isEmpty()) {
+            localUrl += "&playlist=" + playlistIds;
+        }
         System.out.println("Loading: " + localUrl);
         webEngine.load(localUrl);
         loadTimeout.playFromStart();
@@ -361,11 +389,45 @@ public class VideoPlayer extends StackPane {
         if (movie == null) {
             return;
         }
+        playVideo(movie, List.of(movie));
+    }
+
+    public void playVideo(Movie movie, List<Movie> playlist) {
+        if (movie == null) {
+            return;
+        }
         String embedUrl = movie.getYoutubeEmbedUrl();
         if (server != null && extractVideoId(embedUrl) != null) {
             onMoviePlayed.accept(movie);
         }
-        playVideo(embedUrl);
+        playVideo(embedUrl, getNextVideoIds(movie, playlist));
+    }
+
+    private String getNextVideoIds(Movie movie, List<Movie> playlist) {
+        if (!AppSettings.isAutoPlay() || playlist == null) {
+            return "";
+        }
+        int selectedIndex = -1;
+        for (int i = 0; i < playlist.size(); i++) {
+            Movie candidate = playlist.get(i);
+            if (candidate == movie
+                    || (candidate != null && candidate.getTitle().equals(movie.getTitle()))) {
+                selectedIndex = i;
+                break;
+            }
+        }
+        if (selectedIndex < 0) {
+            return "";
+        }
+
+        List<String> nextVideoIds = new ArrayList<>();
+        for (int i = selectedIndex + 1; i < playlist.size(); i++) {
+            String nextVideoId = extractVideoId(playlist.get(i).getYoutubeEmbedUrl());
+            if (nextVideoId != null) {
+                nextVideoIds.add(nextVideoId);
+            }
+        }
+        return String.join(",", nextVideoIds);
     }
 
     public void setOnMoviePlayed(Consumer<Movie> callback) {

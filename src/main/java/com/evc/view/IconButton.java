@@ -38,7 +38,7 @@ public class IconButton extends HBox {
 
         this.getChildren().addAll(icon, label);
 
-        this.setOnMouseEntered(e -> this.setStyle("-fx-background-color: #3b82f6; -fx-background-radius: 20;"));
+        this.setOnMouseEntered(e -> this.setStyle("-fx-background-color: #e50914; -fx-background-radius: 20;"));
         this.setOnMouseExited(e -> this.setStyle("-fx-background-color: #2a2a2a; -fx-background-radius: 20;"));
     }
 
